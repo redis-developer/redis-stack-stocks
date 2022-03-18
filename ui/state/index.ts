@@ -34,6 +34,11 @@ export interface Stock {
   news: News[];
 }
 
+export interface IncomingTrade {
+    symbol: string;
+    trade: [number, number];
+}
+
 export interface Notification {
   text: string | string[] | ArrayLike<string>;
   label?: string;
@@ -84,12 +89,24 @@ if (!isServerSide()) {
     if (!state.currentStock) {
       return;
     }
+    let incomingTrade: IncomingTrade = ev.data;
 
-    if (ev.data === state.currentStock.pk) {
+    if (typeof incomingTrade === "string") {
+        incomingTrade = JSON.parse(ev.data);
+    }
+
+
+    if (incomingTrade.symbol === state.currentStock.pk) {
       await actor.getStockTrades(state.currentStock.pk);
     }
 
-    await actor.updateWatchlistTrades();
+    const stockTrades: typeof state.stockTrades = clone('stockTrades');
+    if (!stockTrades) {
+        return;
+    }
+
+    stockTrades[incomingTrade.symbol] = incomingTrade.trade;
+    state.stockTrades = stockTrades;
   };
 
   const barWs = new WebSocket(`${WS_URL}/bars`);

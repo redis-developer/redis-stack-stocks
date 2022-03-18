@@ -35,7 +35,7 @@ ALPACA_SECRET_KEY = os.getenv("APCA_API_SECRET_KEY")
 
 def get_historical_news(symbol):
     now = datetime.datetime.now(datetime.timezone.utc)
-    end = now - relativedelta(days=1)
+    end = now - relativedelta(minutes=16)
     start = now - relativedelta(days=8)
     values = api.get_news(symbol, start.isoformat(), end.isoformat(), limit=50)
     return [x._raw for x in values]
@@ -43,8 +43,8 @@ def get_historical_news(symbol):
 
 def get_historical_trades(symbol):
     now = datetime.datetime.now(datetime.timezone.utc)
-    end = now - relativedelta(days=1)
-    start = now - relativedelta(days=8)
+    end = now - relativedelta(minutes=16)
+    start = now - relativedelta(minutes=76)
     values = api.get_trades(symbol, start.isoformat(),
                             end.isoformat(), limit=50)
 
@@ -61,8 +61,8 @@ def get_historical_trades(symbol):
 
 def get_historical_bars(symbol):
     now = datetime.datetime.now(datetime.timezone.utc)
-    end = now - relativedelta(days=1)
-    start = now - relativedelta(days=2)
+    end = now - relativedelta(minutes=16)
+    start = now - relativedelta(minutes=76)
     values = api.get_bars(symbol, TimeFrame(
         1, TimeFrameUnit.Minute), start.isoformat(), end.isoformat(), limit=1000)
     return [{
@@ -77,8 +77,8 @@ def get_historical_bars(symbol):
 
 def get_historical_quotes(symbol):
     now = datetime.datetime.now(datetime.timezone.utc)
-    end = now - relativedelta(days=1)
-    start = now - relativedelta(days=8)
+    end = now - relativedelta(minutes=16)
+    start = now - relativedelta(minutes=76)
     values = api.get_quotes(symbol, start.isoformat(),
                             end.isoformat(), limit=1000)
     return [{

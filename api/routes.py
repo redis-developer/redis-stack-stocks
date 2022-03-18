@@ -57,13 +57,20 @@ async def bars(symbol: str):
     now = datetime.datetime.now(datetime.timezone.utc)
     end = now - relativedelta(minutes=1)
     start = now - relativedelta(minutes=30)
-    return db_sync.ts().range(f'stocks:{symbol.upper()}:bars:close', str(int(
-        start.timestamp() * 1000)), str(int(end.timestamp() * 1000)))
+
+    try:
+        return db_sync.ts().range(f'stocks:{symbol.upper()}:bars:close', str(int(
+            start.timestamp() * 1000)), str(int(end.timestamp() * 1000)))
+    except:
+        return []
 
 
 @router.get('/trade/{symbol}')
 async def trade(symbol: str):
-    return db_sync.ts().get(f'stocks:{symbol.upper()}:trades:price')
+    try:
+        return db_sync.ts().get(f'stocks:{symbol.upper()}:trades:price')
+    except:
+        return [0, 0]
 
 
 @router.get('/trending')
@@ -98,7 +105,12 @@ async def trades_ws(websocket: WebSocket):
         if ev['type'] == 'subscribe':
             continue
 
-        await websocket.send_text(ev['data'].decode('utf-8'))
+        symbol = ev['data'].decode('utf-8').upper()
+        trade = db_sync.ts().get(f'stocks:{symbol.upper()}:trades:price')
+        await websocket.send_json({
+            'symbol': symbol,
+            'trade': trade
+        })
 
 
 @router.websocket_route('/bars')
