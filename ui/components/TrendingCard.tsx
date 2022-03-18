@@ -27,7 +27,7 @@ function TrendingCard() {
                   <div className="font-semibold text-left">Symbol</div>
                 </th>
                 <th className="p-2 whitespace-nowrap">
-                  <div className="font-semibold text-left"># of Trades</div>
+                  <div className="font-semibold text-left">Score</div>
                 </th>
               </tr>
             </thead>
