@@ -31,3 +31,7 @@ After the containers are up and running, go into the `data` directory and run:
 $ pip install -r requirements.txt
 $ python main.py
 ```
+
+# Known Issues
+
+1. There is a known issue with the Alpaca websocket API thread safety. Right now if you watch/unwatch a stock you will need to restart the stream container, as it will silently halt when you try to dynamically update websocket subscriptions.
