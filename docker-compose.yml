@@ -1,0 +1,60 @@
+version: "3.9"
+services:
+  redis:
+    container_name: redis
+    image: "redislabs/redismod:edge"
+    ports:
+      - 6379:6379
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - redis-stack-stocks
+  api:
+    container_name: api
+    build: ./api
+    ports:
+      - 8000:8000
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - REDIS_OM_URL=redis://redis:6379
+    networks:
+      - redis-stack-stocks
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - redis
+  stream:
+    container_name: stream
+    build: ./stream
+    environment:
+      - APCA_API_KEY_ID=${APCA_API_KEY_ID}
+      - APCA_API_SECRET_KEY=${APCA_API_SECRET_KEY}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_OM_URL=redis://redis:6379
+    networks:
+      - redis-stack-stocks
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - redis
+  ui:
+    container_name: ui
+    build:
+      context: ./ui
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000/api/1.0
+        - NEXT_PUBLIC_WS_URL=ws://localhost:8000
+    ports:
+      - 3000:3000
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+networks:
+  redis-stack-stocks: {}
