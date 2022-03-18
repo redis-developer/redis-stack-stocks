@@ -3,9 +3,6 @@ from alpaca import sync_watchlist, aioconnect
 from connection import db, db_sync
 import asyncio
 import logging
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 async def reserve_topk():

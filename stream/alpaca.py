@@ -11,6 +11,21 @@ from alpaca_trade_api.rest import REST, TimeFrame, TimeFrameUnit
 from models import Stock
 from connection import db, db_sync
 
+
+### This is a workaround to eliminate the threadsafe issue with the Alpaca SDK
+def noop(*args, **kws):
+    return None
+
+
+def run_coroutine_threadsafe(coro, loop):
+    logging.log(logging.INFO, 'test')
+    asyncio.create_task(coro)
+    return type('obj', (object,), {'result': noop})
+
+asyncio.run_coroutine_threadsafe = run_coroutine_threadsafe
+### End Alpaca SDK workaround
+
+
 # define APCA_API_SECRET_KEY and APCA_API_KEY environment variables
 api = REST()
 
@@ -279,13 +294,20 @@ def connect():
     global conn
 
     logging.log(logging.INFO, "Connecting to Alpaca")
-    conn.run()
+    try:
+        conn.run()
+    except Exception as e:
+        print(e)
 
 
 async def aioconnect():
     global conn
     logging.log(logging.INFO, "Connecting to Alpaca")
-    await conn._run_forever()
+
+    try:
+        await conn._run_forever()
+    except Exception as e:
+        print(e)
 
 
 async def unsubscribe(*symbols: str):
@@ -312,8 +334,10 @@ async def sync_watchlist():
         global watch_list
         new_watch_list = await db.smembers('watchlist')
 
-        unsubs = [s.decode('utf-8').upper() for s in set(watch_list) - set(new_watch_list)]
-        subs = [s.decode('utf-8').upper() for s in set(new_watch_list) - set(watch_list)]
+        unsubs = [s.decode('utf-8').upper()
+                  for s in set(watch_list) - set(new_watch_list)]
+        subs = [s.decode('utf-8').upper()
+                for s in set(new_watch_list) - set(watch_list)]
 
         if len(unsubs) > 0:
             await unsubscribe(*unsubs)
