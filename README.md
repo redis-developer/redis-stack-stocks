@@ -1,6 +1,8 @@
 # Introduction
 
-This project demonstrates how you can use the multi-model capabilities of Redis to create a real-time stock watchlist application. It uses several different features of Redis:
+![redis-stack-stocks](./redis-stack-stocks.png)
+
+This project demonstrates how you can use Redis Stack to create a real-time stock watchlist application. It uses several different features of Redis:
 
 - Sets
 - Pub/Sub
