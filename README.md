@@ -100,3 +100,7 @@ $ npm run dev
 # Known Issues
 
 1. There is a known issue with the Alpaca websocket API thread safety. You will find a workaround in the alpaca.py file.
+
+# Managed Hosting
+
+Redis offers [managed hosting for Redis Stack](https://redis.info/3tyWUYJ) for free, and you can even get $200 in credits towards a paid subscription by using code TIGER200.
