@@ -2,7 +2,7 @@ version: "3.9"
 services:
   redis:
     container_name: redis
-    image: "redislabs/redismod:edge"
+    image: "redis/redis-stack:latest"
     ports:
       - 6379:6379
     deploy:
