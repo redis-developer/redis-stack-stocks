@@ -1,0 +1,40 @@
+{
+  "app_name": "Redis Stack Stocks",
+  "description": "This project demonstrates how you can use Redis Stack to create a real-time stock watchlist application. It uses several different features of Redis Stack",
+  "type": "Full App",
+  "contributed_by": "Redis",
+  "repo_url": "https://github.com/redis-developer/redis-stack-stocks",
+  "preview_image_url": "https://user-images.githubusercontent.com/785258/159783304-d8c1daa8-49b4-43a4-a9b2-0d7a1541a342.png",
+  "download_url": "https://github.com/redis-developer/redis-stack-stocks/archive/main.zip",
+  "hosted_url": "",
+  "quick_deploy": "false",
+  "deploy_buttons": [],
+  "language": ["JavaScript"],
+  "redis_commands": [
+    "FT.CREATE",
+    "FT.SEARCH",
+    "TS.MADD",
+    "TS.RANGE",
+    "TS.GET",
+    "TOPK.ADD",
+    "TOPK.LIST",
+    "TOPK.RESERVE",
+    "SADD",
+    "SMEMBERS",
+    "SISMEMBER",
+    "HSET",
+    "PUBLISH",
+    "PSUBSCRIBE",
+    "PUNSUBSCRIBE",
+    "EXPIRE"
+  ],
+  "redis_features": ["real-time", "primary database"],
+  "redis_modules": ["RedisJSON", "RediSearch", "RedisTimeseries", "RedisBloom"],
+  "app_image_urls": [
+    "https://user-images.githubusercontent.com/785258/159783304-d8c1daa8-49b4-43a4-a9b2-0d7a1541a342.png"
+  ],
+  "youtube_url": "",
+  "special_tags": [],
+  "verticals": ["Financial", "Technology"],
+  "markdown": "https://github.com/redis-developer/redis-stack-stocks/main/README.md"
+}
