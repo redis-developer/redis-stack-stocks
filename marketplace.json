@@ -36,5 +36,5 @@
   "youtube_url": "https://www.youtube.com/watch?v=mUNFvyrsl8Q",
   "special_tags": [],
   "verticals": ["Financial", "Technology"],
-  "markdown": "https://github.com/redis-developer/redis-stack-stocks/main/README.md"
+  "markdown": "https://raw.githubusercontent.com/redis-developer/redis-stack-stocks/main/README.md"
 }
