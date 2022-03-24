@@ -30,9 +30,7 @@
   ],
   "redis_features": ["real-time", "primary database"],
   "redis_modules": ["RedisJSON", "RediSearch", "RedisTimeseries", "RedisBloom"],
-  "app_image_urls": [
-    "https://user-images.githubusercontent.com/785258/159783304-d8c1daa8-49b4-43a4-a9b2-0d7a1541a342.png"
-  ],
+  "app_image_urls": [],
   "youtube_url": "https://www.youtube.com/watch?v=mUNFvyrsl8Q",
   "special_tags": [],
   "verticals": ["Financial", "Technology"],
