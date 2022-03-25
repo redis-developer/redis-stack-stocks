@@ -18,7 +18,6 @@ def noop(*args, **kws):
 
 
 def run_coroutine_threadsafe(coro, loop):
-    logging.log(logging.INFO, 'test')
     asyncio.create_task(coro)
     return type('obj', (object,), {'result': noop})
 
