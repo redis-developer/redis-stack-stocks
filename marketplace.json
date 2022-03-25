@@ -2,7 +2,7 @@
   "app_name": "Redis Stack Stocks",
   "description": "This project demonstrates how you can use Redis Stack to create a real-time stock watchlist application. It uses several different features of Redis Stack",
   "type": "Full App",
-  "featured": true,
+  "featured": "true",
   "contributed_by": "Redis",
   "repo_url": "https://github.com/redis-developer/redis-stack-stocks",
   "preview_image_url": "https://raw.githubusercontent.com/redis-developer/redis-stack-stocks/main/image2-redistack.png",
