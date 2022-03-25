@@ -1,7 +1,7 @@
 {
   "app_name": "Redis Stack Stocks",
   "description": "This project demonstrates how you can use Redis Stack to create a real-time stock watchlist application. It uses several different features of Redis Stack",
-  "rank": 41,
+  "rank": 42,
   "featured": true,
   "type": "Full App",
   "contributed_by": "Redis",
