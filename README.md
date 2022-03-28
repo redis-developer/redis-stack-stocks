@@ -1,6 +1,6 @@
 # Introduction
 
-![redis-stack-stocks](https://user-images.githubusercontent.com/785258/159783304-d8c1daa8-49b4-43a4-a9b2-0d7a1541a342.png)
+![redis-stack-stocks](./redis-stack-stocks.png)
 
 
 This project demonstrates how you can use Redis Stack to create a real-time stock watchlist application. It uses several different features of Redis:
