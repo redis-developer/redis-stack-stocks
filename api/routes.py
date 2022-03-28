@@ -1,4 +1,6 @@
 import datetime
+import pytz
+import pandas_market_calendars as mcal
 import redis
 from dateutil.relativedelta import relativedelta
 from typing import List
@@ -8,6 +10,25 @@ from connection import db, db_sync
 
 router = APIRouter(prefix='/api/1.0')
 
+
+def get_last_market_close():
+    exchange = mcal.get_calendar('NASDAQ')
+    today = datetime.datetime.now(pytz.timezone('US/Eastern'))
+    today.strftime('%Y-%m-%d')
+    valid_days = exchange.valid_days(start_date=(
+        today - relativedelta(days=14)).strftime('%Y-%m-%d'), end_date=today.strftime('%Y-%m-%d'))
+    last_day = valid_days[-2]
+    close = exchange['market_close', last_day.strftime('%Y-%m-%d')]
+    return datetime.datetime(
+        year=last_day.year,
+        month=last_day.month,
+        day=last_day.day,
+        hour=close.hour,
+        minute=close.minute,
+        second=0,
+        microsecond=0,
+        tzinfo=pytz.timezone('US/Eastern')
+    )
 
 @router.post('/watchlist/{symbol}')
 async def watch(symbol: str):
@@ -56,11 +77,27 @@ async def search(query: str):
 async def bars(symbol: str):
     now = datetime.datetime.now(datetime.timezone.utc)
     end = now - relativedelta(minutes=1)
-    start = now - relativedelta(minutes=30)
+    start = now - relativedelta(days=7)
 
     try:
-        return db_sync.ts().range(f'stocks:{symbol.upper()}:bars:close', str(int(
-            start.timestamp() * 1000)), str(int(end.timestamp() * 1000)))
+        return db_sync.ts().revrange(f'stocks:{symbol.upper()}:bars:close', str(int(
+            start.timestamp() * 1000)), str(int(end.timestamp() * 1000)), count=30)
+    except:
+        return []
+
+
+@router.get('/close/{symbol}')
+async def close(symbol: str):
+    time = get_last_market_close()
+
+    try:
+        results = db_sync.ts().revrange(f'stocks:{symbol.upper()}:bars:close', str(int(
+            (time - relativedelta(days=3)).timestamp() * 1000)), str(int(time.timestamp() * 1000)), count=1)
+
+        if len(results) > 0:
+            return results[0]
+
+        return []
     except:
         return []
 
@@ -91,7 +128,8 @@ async def trending_stocks_ws(websocket: WebSocket):
         if ev['type'] == 'subscribe':
             continue
 
-        trending: List[str] = db_sync.topk().list('trending-stocks', withcount=True)
+        trending: List[str] = db_sync.topk().list(
+            'trending-stocks', withcount=True)
         await websocket.send_json(trending)
 
 

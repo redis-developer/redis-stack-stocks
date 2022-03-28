@@ -16,6 +16,7 @@ import "chartjs-adapter-moment";
 // Import utilities
 import { tailwindConfig, formatValue } from "@utils";
 import useLayoutEffect from "@utils/useLayoutEffect";
+import { PriceInfo } from "@state";
 
 Chart.register(
   LineController,
@@ -31,10 +32,10 @@ export interface RealtimeChartProps {
   width: number;
   height: number;
   data: ChartData;
-  trades: [[number, number], [number, number]] | null;
+  stockInfo: PriceInfo | null;
 }
 
-function RealtimeChart({ data, width, height, trades }: RealtimeChartProps) {
+function RealtimeChart({ data, width, height, stockInfo }: RealtimeChartProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const chartValue = useRef<HTMLSpanElement>(null);
   const chartDeviation = useRef<HTMLDivElement>(null);
@@ -109,31 +110,24 @@ function RealtimeChart({ data, width, height, trades }: RealtimeChartProps) {
 
   // Update header values
   useLayoutEffect(() => {
-    if (!chartValue.current || !chartDeviation.current || !trades) return;
+    if (!chartValue.current || !chartDeviation.current || !stockInfo) return;
 
-    const currentValue = trades[1][1];
-    const previousValue = trades[0][1];
-
-    const diff =
-      (((currentValue as number) - (previousValue as number)) /
-        (previousValue as number)) *
-      100;
     chartValue.current.innerHTML = `${
-      formatValue(currentValue as number).replace('$', '')
+      formatValue(stockInfo.lastPrice).replace('$', '')
     }`;
-    if (diff < 0) {
+    if (stockInfo.change < 0) {
       chartDeviation.current.style.backgroundColor = (
         tailwindConfig()?.theme?.colors as any
-      )?.yellow[500];
+      )?.red[500];
     } else {
       chartDeviation.current.style.backgroundColor = (
         tailwindConfig()?.theme?.colors as any
       )?.green[500];
     }
-    chartDeviation.current.innerHTML = `${diff > 0 ? "+" : ""}${diff.toFixed(
+    chartDeviation.current.innerHTML = `${stockInfo.change > 0 ? "+" : ""}${stockInfo.change.toFixed(
       2
     )}%`;
-  }, [data, trades]);
+  }, [data, stockInfo]);
 
   return (
     <React.Fragment>

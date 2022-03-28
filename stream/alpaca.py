@@ -8,11 +8,11 @@ from dateutil.relativedelta import relativedelta
 from alpaca_trade_api.stream import Stream, Trade, Bar, Quote, NewsV2
 from alpaca_trade_api.common import URL
 from alpaca_trade_api.rest import REST, TimeFrame, TimeFrameUnit
-from models import Stock
+from models import News, Stock
 from connection import db, db_sync
 
 
-### This is a workaround to eliminate the threadsafe issue with the Alpaca SDK
+# This is a workaround to eliminate the threadsafe issue with the Alpaca SDK
 def noop(*args, **kws):
     return None
 
@@ -21,8 +21,9 @@ def run_coroutine_threadsafe(coro, loop):
     asyncio.create_task(coro)
     return type('obj', (object,), {'result': noop})
 
+
 asyncio.run_coroutine_threadsafe = run_coroutine_threadsafe
-### End Alpaca SDK workaround
+# End Alpaca SDK workaround
 
 
 # define APCA_API_SECRET_KEY and APCA_API_KEY environment variables
@@ -185,17 +186,47 @@ async def update_bar(bar: Bar):
 async def incoming_bar(bar: Bar):
     asyncio.create_task(update_bar(bar))
 
+async def update_news(news: NewsV2):
+    """
+        Sample news object:
 
-async def incoming_news(news: NewsV2):
+    {
+        "T": "n",
+        "id": 24918784,
+        "headline": "Corsair Reports Purchase Of Majority Ownership In iDisplay, No Terms Disclosed",
+        "summary": "Corsair Gaming, Inc. (NASDAQ:CRSR) (“Corsair”), a leading global provider and innovator of high-performance gear for gamers and content creators, today announced that it acquired a 51% stake in iDisplay",
+        "author": "Benzinga Newsdesk",
+        "created_at": "2022-01-05T22:00:37Z",
+        "updated_at": "2022-01-05T22:00:38Z",
+        "url": "https://www.benzinga.com/m-a/22/01/24918784/corsair-reports-purchase-of-majority-ownership-in-idisplay-no-terms-disclosed",
+        "content": "\u003cp\u003eCorsair Gaming, Inc. (NASDAQ:\u003ca class=\"ticker\" href=\"https://www.benzinga.com/stock/CRSR#NASDAQ\"\u003eCRSR\u003c/a\u003e) (\u0026ldquo;Corsair\u0026rdquo;), a leading global ...",
+        "symbols": ["CRSR"],
+        "source": "benzinga"
+    }
+    """
     logging.log(logging.INFO, f'New news for {news.symbol}')
     logging.log(logging.DEBUG, str(news))
     try:
-        await Stock.add_news(news.symbol, **news)
+        await Stock.add_news(news.symbol, News(
+            id=news._raw['id'],
+            headline=news._raw['headline'],
+            author=news._raw['author'],
+            created_at=news._raw['created_at'],
+            updated_at=news._raw['updated_at'],
+            summary=news._raw['summary'],
+            url=news._raw['url'],
+            images=news._raw['images'],
+            symbols=news._raw['symbols'],
+            source=news._raw['source'],
+        ))
     except:
         pass
 
+async def incoming_news(news: NewsV2):
+    asyncio.create_task(update_news(news))
 
-async def incoming_quote(quote: Quote):
+
+async def update_quote(quote: Quote):
     """
         Sample quote object:
     {
@@ -236,6 +267,9 @@ async def incoming_quote(quote: Quote):
             timestamp,
             quote.bid_size
         )])
+
+async def incoming_quote(quote: Quote):
+    asyncio.create_task(update_quote(quote))
 
 
 async def initialize_stock(symbol: str):
@@ -313,6 +347,7 @@ async def unsubscribe(*symbols: str):
     global conn
     conn.unsubscribe_trades(*symbols)
     conn.unsubscribe_bars(*symbols)
+    conn.unsubscribe_news(*symbols)
 
 
 async def subscribe(*symbols: str):
@@ -322,6 +357,7 @@ async def subscribe(*symbols: str):
         await initialize_stock(symbol)
     conn.subscribe_trades(incoming_trade, *symbols)
     conn.subscribe_bars(incoming_bar, *symbols)
+    conn.subscribe_news(incoming_news, *symbols)
     logging.log(logging.INFO, f'Subscribed to {symbols}')
 
 

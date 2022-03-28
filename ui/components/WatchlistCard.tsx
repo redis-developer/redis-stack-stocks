@@ -1,12 +1,72 @@
-import state from "@state";
+import state, { Stock } from "@state";
 import { formatValue } from "@utils";
 import React, { useState } from "react";
 import SearchModal from "./header/SearchModal";
 
+interface WatchlistRowProps {
+  stock: Stock;
+  color?: string;
+  onDelete: (symbol: string) => any;
+  onClick: (stock: Stock) => any;
+}
+
+function WatchlistRow({
+  stock,
+  color = "",
+  onDelete,
+  onClick,
+}: WatchlistRowProps) {
+  const stockInfo = state.hooks.useStockInfo({
+    key: stock.symbol,
+  });
+
+  return (
+    <tr className={`cursor-pointer hover:bg-slate-200${color}`}>
+      <td
+        className="p-2 whitespace-nowrap"
+        onClick={() => {
+          onDelete(stock.symbol);
+        }}
+      >
+        <div className="flex items-center">
+          <div className="font-medium text-slate-800 text-2xl">⮾</div>
+        </div>
+      </td>
+      <td
+        className="p-2 whitespace-nowrap"
+        onClick={() => {
+          onClick(stock);
+        }}
+      >
+        <div className="flex items-center">
+          <div className="font-medium text-slate-800">{stock.symbol}</div>
+        </div>
+      </td>
+      <td
+        className="p-2 whitespace-nowrap"
+        onClick={() => {
+          onClick(stock);
+        }}
+      >
+        <div className="text-left">{stock.name}</div>
+      </td>
+      <td
+        className="p-2 whitespace-nowrap"
+        onClick={() => {
+          onClick(stock);
+        }}
+      >
+        <span className={`text-sm font-semibold text-white p-1.5 rounded-full ${stockInfo && stockInfo.change > 0 ? 'bg-green-500' : 'bg-red-500'}`}>
+          {stockInfo && formatValue(stockInfo.lastPrice)}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
 function TrendingCard() {
   const currentStock = state.hooks.useCurrentStock();
   const watchList = state.hooks.useWatchList();
-  const watchListTrades = state.hooks.useStockTrades();
   const [searchModalOpen, setSearchModalOpen] = useState(false);
 
   return (
@@ -71,54 +131,17 @@ function TrendingCard() {
             <tbody className="text-sm divide-y divide-slate-100">
               {watchList?.map((stock) => {
                 return (
-                  <tr
-                    key={stock.pk}
-                    className={`cursor-pointer hover:bg-slate-200${stock.symbol === currentStock?.symbol ? ' bg-cyan-200' : ''}`}
-                  >
-                    <td
-                      className="p-2 whitespace-nowrap"
-                      onClick={() => {
-                        state.unwatch(stock.symbol);
-                      }}
-                    >
-                      <div className="flex items-center">
-                        <div className="font-medium text-slate-800 text-2xl">
-                          ⮾
-                        </div>
-                      </div>
-                    </td>
-                    <td
-                      className="p-2 whitespace-nowrap"
-                      onClick={() => {
-                        state.setCurrentStock(stock);
-                      }}
-                    >
-                      <div className="flex items-center">
-                        <div className="font-medium text-slate-800">
-                          {stock.symbol}
-                        </div>
-                      </div>
-                    </td>
-                    <td
-                      className="p-2 whitespace-nowrap"
-                      onClick={() => {
-                        state.setCurrentStock(stock);
-                      }}
-                    >
-                      <div className="text-left">{stock.name}</div>
-                    </td>
-                    <td
-                      className="p-2 whitespace-nowrap"
-                      onClick={() => {
-                        state.setCurrentStock(stock);
-                      }}
-                    >
-                      <div className="text-left">
-                        {watchListTrades &&
-                          formatValue(watchListTrades[stock.symbol]?.[1])}
-                      </div>
-                    </td>
-                  </tr>
+                  <WatchlistRow
+                    key={stock.symbol}
+                    color={
+                      stock.symbol === currentStock?.symbol
+                        ? " bg-cyan-200"
+                        : ""
+                    }
+                    stock={stock}
+                    onDelete={state.unwatch}
+                    onClick={state.setCurrentStock}
+                  />
                 );
               })}
             </tbody>

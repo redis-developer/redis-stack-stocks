@@ -10,7 +10,9 @@ import { ChartData } from "chart.js";
 function ChartCard() {
   const stock = state.hooks.useCurrentStock();
   const bars = state.hooks.useCurrentStockBars();
-  const trades = state.hooks.useTrades();
+  const stockInfo = state.hooks.useStockInfo({
+    key: stock?.symbol,
+  });
 
   const slicedData = bars?.map((bar) => bar[1]) ?? [];
   const slicedLabels = bars?.map((bar) => new Date(bar[0])) ?? [];
@@ -47,7 +49,7 @@ function ChartCard() {
       </header>
       {/* Chart built with Chart.js 3 */}
       {/* Change the height attribute to adjust the chart height */}
-      <RealtimeChart trades={trades} data={chartData} width={595} height={496} />
+      <RealtimeChart stockInfo={stockInfo} data={chartData} width={595} height={496} />
     </div>
   );
 }

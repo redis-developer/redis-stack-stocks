@@ -38,11 +38,22 @@ function TrendingCard() {
                   return;
                 }
 
+                const colors = ["bg-green-200", "bg-blue-200", "bg-yellow-200"];
+                let color = colors[0];
+
+                if (index < 4) {
+                    color = colors[0];
+                } else if (index < 8) {
+                    color = colors[1];
+                } else {
+                    color = colors[2];
+                }
+
                 return (
-                  <tr key={symbol}>
+                  <tr key={symbol} className={color}>
                     <td className="p-2 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="font-medium text-slate-800">
+                        <div className="font-semibold text-slate-800">
                           {symbol}
                         </div>
                       </div>

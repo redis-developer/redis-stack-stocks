@@ -1,5 +1,5 @@
 import isServerSide from "@utils/isServerSide";
-import { createStateHook } from "react-tates";
+import { createKeyedStateHook, createStateHook } from "react-tates";
 import tates from "tates";
 
 export interface Image {
@@ -34,9 +34,15 @@ export interface Stock {
   news: News[];
 }
 
+export interface PriceInfo {
+  lastPrice: number;
+  change: number;
+  lastClose: number;
+}
+
 export interface IncomingTrade {
-    symbol: string;
-    trade: [number, number];
+  symbol: string;
+  trade: [number, number];
 }
 
 export interface Notification {
@@ -52,7 +58,7 @@ export interface State {
   currentStock: Stock | null;
   trending: (string | number)[] | null;
   trades: [[number, number], [number, number]] | null;
-  stockTrades: Record<string, [number, number]> | null;
+  stockInfo: Record<string, PriceInfo> | null;
   currentStockBars: [number, number][] | null;
 }
 
@@ -68,9 +74,13 @@ const props = {
   NOTIFICATION: "notification",
   CURRENT_STOCK: "currentStock",
   TRADES: "trades",
-  STOCK_TRADES: "stockTrades",
+  STOCK_INFO: "stockInfo",
   CURRENT_STOCK_BARS: "currentStockBars",
 };
+
+function change(current: number, previous: number) {
+  return ((current - previous) / previous) * 100;
+}
 
 if (!isServerSide()) {
   const trendingWs = new WebSocket(`${WS_URL}/trending`);
@@ -92,21 +102,19 @@ if (!isServerSide()) {
     let incomingTrade: IncomingTrade = ev.data;
 
     if (typeof incomingTrade === "string") {
-        incomingTrade = JSON.parse(ev.data);
+      incomingTrade = JSON.parse(ev.data);
     }
 
-
-    if (incomingTrade.symbol === state.currentStock.pk) {
-      await actor.getStockTrades(state.currentStock.pk);
+    if (!state.stockInfo) {
+      return;
     }
 
-    const stockTrades: typeof state.stockTrades = clone('stockTrades');
-    if (!stockTrades) {
-        return;
-    }
-
-    stockTrades[incomingTrade.symbol] = incomingTrade.trade;
-    state.stockTrades = stockTrades;
+    const stockInfo = state.stockInfo[incomingTrade.symbol];
+    state.stockInfo[incomingTrade.symbol] = {
+      lastPrice: incomingTrade.trade[1],
+      change: change(incomingTrade.trade[1], stockInfo.lastClose),
+      lastClose: stockInfo.lastClose,
+    };
   };
 
   const barWs = new WebSocket(`${WS_URL}/bars`);
@@ -132,17 +140,6 @@ const actions = {
     const json: [number, number][] = await response.json();
     state.currentStockBars = json;
   },
-  async getStockTrades(symbol: string) {
-    const response = await fetch(`${API_URL}/trade/${symbol}`);
-    const json: [number, number] = await response.json();
-    let lastTrade: [number, number] = [0, 0];
-
-    if (state.currentStockBars && state.currentStockBars.length > 0) {
-      lastTrade = state.currentStockBars[state.currentStockBars.length - 1];
-    }
-
-    state.trades = [lastTrade, json];
-  },
   async updateWatchlistTrades(watchlist?: Stock[] | null) {
     watchlist = watchlist ?? state.watchlist;
 
@@ -150,17 +147,32 @@ const actions = {
       return;
     }
 
-    const stockTrades: Record<string, [number, number]> = {};
+    const stockInfo: Record<string, PriceInfo> = {};
 
     for (let i = 0; i < watchlist.length; i++) {
       const stock = watchlist[i];
-      const response = await fetch(`${API_URL}/trade/${stock.symbol}`);
-      const json: [number, number] = await response.json();
+      const [tradesResponse, closeResponse] = await Promise.all([
+        fetch(`${API_URL}/trade/${stock.symbol}`),
+        fetch(`${API_URL}/close/${stock.symbol}`),
+      ]);
+      const [trades, close]: [[number, number], [number, number]] =
+        await Promise.all([tradesResponse.json(), closeResponse.json()]);
 
-      stockTrades[stock.symbol] = json;
+      const lastPrice = trades[1];
+      const lastClose = close[1];
+      const change =
+        (((lastPrice as number) - (lastClose as number)) /
+          (lastClose as number)) *
+        100;
+
+      stockInfo[stock.symbol] = {
+        lastPrice,
+        change,
+        lastClose,
+      };
     }
 
-    state.stockTrades = stockTrades;
+    state.stockInfo = stockInfo;
   },
   async getWatchList() {
     const response = await fetch(`${API_URL}/watchlist`);
@@ -207,7 +219,6 @@ const actions = {
   async setCurrentStock(stock: Stock) {
     state.currentStock = stock;
     actions.getCurrentStockBars(stock.symbol);
-    actions.getStockTrades(stock.symbol);
   },
 };
 
@@ -217,21 +228,13 @@ const hooks = {
     property: props.TRENDING,
     action: actions.getTrendingStocks,
   }),
-  useTrades: createStateHook<
-    [[number, number], [number, number]],
+  useStockInfo: createKeyedStateHook<
+    PriceInfo,
     typeof tate,
     any
   >({
     tate,
-    property: props.TRADES,
-  }),
-  useStockTrades: createStateHook<
-    Record<string, [number, number]>,
-    typeof tate,
-    any
-  >({
-    tate,
-    property: props.STOCK_TRADES,
+    property: props.STOCK_INFO,
   }),
   useCurrentStockBars: createStateHook<[number, number][], typeof tate, any>({
     tate,
