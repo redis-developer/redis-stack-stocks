@@ -1,2 +1,2 @@
-redis==4.2.0
-redis-om==0.0.20
+redis==4.3.3
+redis-om==0.0.27

@@ -1,7 +1,7 @@
-redis==4.2.0
+redis==4.3.3
 python-dotenv==0.20.0
-pydantic==1.9.0
+pydantic==1.9.1
 itsdangerous==2.1.2
-redis-om==0.0.20
+redis-om==0.0.27
 python-dateutil==2.8.2
-alpaca_trade_api==1.5.1
+alpaca_trade_api==2.3.0
