@@ -8,10 +8,10 @@ This project demonstrates how you can use Redis Stack to create a real-time stoc
 - Sets
 - Pub/Sub
 - Hashes
-- RedisTimeSeries
+-Redis Time Series
 - RedisBloom
-- RedisJSON
-- RediSearch
+- Redis JSON
+- Redis Search
 
 # Usage with Docker
 
