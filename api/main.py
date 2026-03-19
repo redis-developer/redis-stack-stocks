@@ -1,11 +1,20 @@
-import os
-from aredis_om.model import Migrator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from connection import db_sync
 from routes import router
+from store import ensure_index
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    ensure_index(db_sync)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,13 +22,5 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 app.include_router(router)
-
-procs = []
-
-@app.on_event("startup")
-async def startup():
-    print("Starting API")
-    await Migrator().run()

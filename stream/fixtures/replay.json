@@ -1,0 +1,72 @@
+{
+  "symbols": {
+    "AAPL": {
+      "basePrice": 191.25,
+      "news": [
+        {
+          "id": "aapl-1",
+          "headline": "Apple expands services revenue in latest product cycle",
+          "author": "Redis Demo Feed",
+          "created_at": "2026-03-18T15:30:00Z",
+          "updated_at": "2026-03-18T15:30:00Z",
+          "summary": "Replay-mode placeholder news for Apple.",
+          "url": "https://example.com/aapl-1",
+          "images": [],
+          "symbols": ["AAPL"],
+          "source": "replay"
+        }
+      ]
+    },
+    "MSFT": {
+      "basePrice": 428.1,
+      "news": [
+        {
+          "id": "msft-1",
+          "headline": "Microsoft cloud margins improve in replay feed",
+          "author": "Redis Demo Feed",
+          "created_at": "2026-03-18T15:31:00Z",
+          "updated_at": "2026-03-18T15:31:00Z",
+          "summary": "Replay-mode placeholder news for Microsoft.",
+          "url": "https://example.com/msft-1",
+          "images": [],
+          "symbols": ["MSFT"],
+          "source": "replay"
+        }
+      ]
+    },
+    "NVDA": {
+      "basePrice": 146.9,
+      "news": [
+        {
+          "id": "nvda-1",
+          "headline": "NVIDIA AI demand remains elevated in replay feed",
+          "author": "Redis Demo Feed",
+          "created_at": "2026-03-18T15:32:00Z",
+          "updated_at": "2026-03-18T15:32:00Z",
+          "summary": "Replay-mode placeholder news for NVIDIA.",
+          "url": "https://example.com/nvda-1",
+          "images": [],
+          "symbols": ["NVDA"],
+          "source": "replay"
+        }
+      ]
+    },
+    "TSLA": {
+      "basePrice": 238.4,
+      "news": [
+        {
+          "id": "tsla-1",
+          "headline": "Tesla delivery outlook stabilizes in replay feed",
+          "author": "Redis Demo Feed",
+          "created_at": "2026-03-18T15:33:00Z",
+          "updated_at": "2026-03-18T15:33:00Z",
+          "summary": "Replay-mode placeholder news for Tesla.",
+          "url": "https://example.com/tsla-1",
+          "images": [],
+          "symbols": ["TSLA"],
+          "source": "replay"
+        }
+      ]
+    }
+  }
+}

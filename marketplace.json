@@ -1,6 +1,6 @@
 {
-  "app_name": "Redis Stack Stocks",
-  "description": "This project demonstrates how you can use Redis Stack to create a real-time stock watchlist application. It uses several different features of Redis Stack",
+  "app_name": "Redis stock watchlist",
+  "description": "This project demonstrates how to build a real-time stock watchlist with Redis, Redis Query Engine, time series, Top-K, and WebSocket updates.",
   "rank": 42,
   "featured": true,
   "type": "Full App",
@@ -31,7 +31,7 @@
     "EXPIRE"
   ],
   "redis_use_cases": ["real-time", "primary database"],
-  "redis_features": ["JSON", "Search and Query", "Time Series", "Probabilistic"],
+  "redis_features": ["JSON", "Redis Search", "Time Series", "Probabilistic"],
   "app_image_urls": [],
   "youtube_url": "https://www.youtube.com/watch?v=mUNFvyrsl8Q",
   "special_tags": [],

@@ -1,60 +1,71 @@
-version: "3.9"
 services:
   redis:
     container_name: redis
-    image: "redis/redis-stack:latest"
+    image: redis:alpine
     ports:
-      - 6379:6379
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-    networks:
-      - redis-stack-stocks
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis-data:/data
+
+  data:
+    container_name: data
+    build:
+      context: ./data
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
   api:
     container_name: api
-    build: ./api
+    build:
+      context: ./api
     ports:
-      - 8000:8000
+      - "8000:8000"
     environment:
-      - REDIS_URL=redis://redis:6379
-      - REDIS_OM_URL=redis://redis:6379
-    networks:
-      - redis-stack-stocks
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
+      REDIS_URL: redis://redis:6379
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      data:
+        condition: service_completed_successfully
+
   stream:
     container_name: stream
-    build: ./stream
+    build:
+      context: ./stream
     environment:
-      - APCA_API_KEY_ID=${APCA_API_KEY_ID}
-      - APCA_API_SECRET_KEY=${APCA_API_SECRET_KEY}
-      - REDIS_URL=redis://redis:6379
-      - REDIS_OM_URL=redis://redis:6379
-    networks:
-      - redis-stack-stocks
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
+      APCA_API_KEY_ID: ${APCA_API_KEY_ID:-}
+      APCA_API_SECRET_KEY: ${APCA_API_SECRET_KEY:-}
+      REDIS_URL: redis://redis:6379
+      MARKET_DATA_MODE: ${MARKET_DATA_MODE:-replay}
+      REPLAY_FIXTURE_PATH: ${REPLAY_FIXTURE_PATH:-}
+      REPLAY_SPEED: ${REPLAY_SPEED:-1}
+      REPLAY_LOOP: ${REPLAY_LOOP:-true}
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      data:
+        condition: service_completed_successfully
+
   ui:
     container_name: ui
     build:
       context: ./ui
       args:
-        - NEXT_PUBLIC_API_URL=http://localhost:8000/api/1.0
-        - NEXT_PUBLIC_WS_URL=ws://localhost:8000
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api/1.0
+        NEXT_PUBLIC_WS_URL: ws://localhost:8000
     ports:
-      - 3000:3000
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-networks:
-  redis-stack-stocks: {}
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  redis-data:

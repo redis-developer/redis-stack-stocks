@@ -1,106 +1,73 @@
-# Introduction
+# Redis stock watchlist
 
-![redis-stack-stocks](./redis-stack-stocks.png)
+This project is a real-time stock watchlist built with Redis, FastAPI, and Next.js.
 
+It uses Redis for:
 
-This project demonstrates how you can use Redis Stack to create a real-time stock watchlist application. It uses several different features of Redis:
+- JSON-backed stock documents
+- Redis Query Engine search over stock symbols and metadata
+- sets for the watchlist
+- time series for trades and price bars
+- Top-K for trending symbols
+- pub/sub for WebSocket fanout
 
-- Sets
-- Pub/Sub
-- Hashes
--Redis Time Series
-- RedisBloom
-- Redis JSON
-- Redis Search
+## Run with Docker
 
-# Usage with Docker
+Copy the environment example if you want to override defaults:
 
-## Requirements
-
-1. Install Docker
-
-Set the following environment variables in a .env file in the root directory of the project:
-
-1. `APCA_API_KEY_ID`: Your Alpaca API Key found on the Alpaca dashboard
-1. `APCA_API_SECRET_KEY`: Your Alpaca API Secret found on the Alpaca dashboard
-
-## Installation
-
-```
-$ docker-compose --env-file ./.env up -d
+```bash
+cp .env.example .env
 ```
 
-After the containers are up and running (for the first time), go into the `data` directory and run:
+Then start the full app:
 
-```
-$ pip install -r requirements.txt
-$ python main.py
-```
-
-# Usage Locally
-
-## Requirements
-
-1. python 3.6+
-1. pip
-
-## Environment Variables
-
-Create a `.env` file in the root directory of the project and set the following environment variables:
-
-```
-APCA_API_KEY_ID=<your-api-key>
-APCA_API_SECRET_KEY=<your-api-secret>
-REDIS_URL=<redis-url>
-REDIS_OM_URL=<redis-url>
+```bash
+./scripts/docker-up.sh
 ```
 
-Create a `.env` file in the `ui` directory of the project and set the following envionrment variables:
+The default runtime is replay mode, so Alpaca credentials are not required.
 
-```
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/1.0
-NEXT_PUBLIC_WS_URL=ws://localhost:8000
-```
+- UI: `http://localhost:3000`
+- API: `http://localhost:8000/api/1.0`
+- Redis: `redis://localhost:6379`
 
-## Installation
+## Run locally
 
-From the root directory, run the following commands:
+Start Redis:
 
-```
-$ python -m venv ./.venv
-```
-
-### Stream Service
-
-Run the following commands in the `stream` directory:
-
-```
-$ pip install -r requirements.txt
-$ python main.py
+```bash
+docker compose up -d redis
 ```
 
-### API Service
+Then run the local dev workflow:
 
-Run the following commands in the `api` directory:
-
-```
-$ pip install -r requirements.txt
-$ uvicorn main:app
+```bash
+./scripts/dev.sh
 ```
 
-### Web Service
+## Scripts
 
-Run the following commands in the `web` directory:
+- `make format`
+- `make test`
+- `make build`
+- `make dev`
+- `make docker-up`
+- `make docker-down`
 
+## Live mode
+
+Replay mode is the default. To switch the stream service to live Alpaca data, set:
+
+```bash
+MARKET_DATA_MODE=live
+APCA_API_KEY_ID=...
+APCA_API_SECRET_KEY=...
 ```
-$ npm install
-$ npm run dev
-```
 
-# Known Issues
+## Tests
 
-1. There is a known issue with the Alpaca websocket API thread safety. You will find a workaround in the alpaca.py file.
+The backend and replay tests expect Redis to be available locally. `./scripts/test.sh` starts Redis first, then runs:
 
-# Managed Hosting
-
-Redis offers [managed hosting for Redis Stack](https://redis.info/3tyWUYJ) for free, and you can even get $200 in credits towards a paid subscription by using code TIGER200.
+- FastAPI route and store tests
+- replay-mode stream tests
+- frontend Vitest tests

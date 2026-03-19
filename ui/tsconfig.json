@@ -1,44 +1,45 @@
 {
   "compilerOptions": {
-    "target": "es5",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
+    "target": "ES2022",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "es2022"
+    ],
+    "allowJs": false,
     "skipLibCheck": true,
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "baseUrl": ".",
     "paths": {
-        "@components/*": [
-          "components/*"
-        ],
-        "@services/*": [
-          "services/*"
-        ],
-        "@state/*": [
-          "state/*"
-        ],
-        "@state": [
-          "state/index.ts"
-        ],
-        "@utils/*": [
-          "utils/*"
-        ],
-        "@utils": [
-          "utils/index.ts"
-        ],
-        "@public/*": [
-          "public/*"
-        ]
-    },
+      "@/*": [
+        "src/*"
+      ]
+    }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "__tests__/**/*.ts",
+    "__tests__/**/*.tsx",
+    "vitest.setup.ts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

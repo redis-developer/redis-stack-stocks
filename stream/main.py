@@ -1,53 +1,68 @@
+from __future__ import annotations
 
-from alpaca import sync_watchlist, aioconnect
-from connection import db, db_sync
 import asyncio
 import logging
+import os
+import time
+
+from alpaca import run_live
+from connection import db, db_sync
+from replay import ReplayFeed
+from store import get_watchlist, reset_trending
+
+LOGGER = logging.getLogger(__name__)
 
 
-async def reserve_topk():
-    db_sync.topk().reserve('trending-stocks', 12, 50, 4, 0.9)
-    await db.expire('trending-stocks', 60)
+async def reset_trending_loop(interval_seconds: int = 60) -> None:
+    while True:
+        reset_trending(db_sync)
+        await asyncio.sleep(interval_seconds)
 
 
-async def listen_for_events():
-    await db.config_set('notify-keyspace-events', 'KEsx')
-    pubsub = db.pubsub()
-    await pubsub.subscribe('__keyspace@0__:trending-stocks')
-    await pubsub.subscribe('__keyspace@0__:watchlist')
+async def replay_loop() -> None:
+    feed = ReplayFeed(os.getenv("REPLAY_FIXTURE_PATH"))
+    speed = max(float(os.getenv("REPLAY_SPEED", "1")), 0.1)
+    loop = os.getenv("REPLAY_LOOP", "true").lower() != "false"
 
-    async for ev in pubsub.listen():
-        if ev['type'] == 'subscribe':
-            continue
+    while True:
+        watchlist = await get_watchlist(db)
+        timestamp_ms = int(time.time() * 1000)
 
-        if ev['data'] == b'expired':
-            logging.log(logging.DEBUG, 'trending-stocks expired')
-            await reserve_topk()
-        elif ev['channel'] == b'__keyspace@0__:watchlist':
-            logging.log(logging.DEBUG, 'watchlist updated')
-            await sync_watchlist()
+        for symbol in watchlist:
+            if symbol in feed.symbols():
+                await feed.emit(db, db_sync, symbol, timestamp_ms)
 
+        feed.advance()
+        await asyncio.sleep(1 / speed)
 
-async def main():
-    asyncio.create_task(aioconnect())
-    await asyncio.sleep(5)
-
-    await db.delete('trending-stocks')
-    await reserve_topk()
-    await sync_watchlist()
-    asyncio.create_task(listen_for_events())
-    while 1:
-        await asyncio.sleep(60)
+        if not loop and feed.tick > 32:
+            break
 
 
-if __name__ == '__main__':
-    logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-                        level=logging.INFO)
+async def run_replay() -> None:
+    asyncio.create_task(reset_trending_loop())
+    await replay_loop()
 
-    logging.log(logging.INFO, 'Starting up...')
+
+async def main() -> None:
+    mode = os.getenv("MARKET_DATA_MODE", "replay").lower()
+    reset_trending(db_sync)
+
+    if mode == "live":
+        await run_live()
+        return
+
+    LOGGER.info("Starting replay mode")
+    await run_replay()
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)s %(message)s",
+        level=logging.INFO,
+    )
+
     try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
-        loop.close()
+        asyncio.run(main())
     except KeyboardInterrupt:
-        pass
+        LOGGER.info("Shutting down stream service")

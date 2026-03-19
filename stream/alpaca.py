@@ -1,387 +1,222 @@
+from __future__ import annotations
+
 import asyncio
 import datetime
 import logging
 import os
-import time
+from collections.abc import Iterable
+
 import dateutil.parser as dp
-from dateutil.relativedelta import relativedelta
-from alpaca_trade_api.stream import Stream, Trade, Bar, Quote, NewsV2
 from alpaca_trade_api.common import URL
 from alpaca_trade_api.rest import REST, TimeFrame, TimeFrameUnit
-from models import News, Stock
+from alpaca_trade_api.stream import Stream
+from dateutil.relativedelta import relativedelta
+
 from connection import db, db_sync
+from store import add_news, get_watchlist, record_bar, record_trade
 
-
-# This is a workaround to eliminate the threadsafe issue with the Alpaca SDK
-def noop(*args, **kws):
-    return None
-
-
-def run_coroutine_threadsafe(coro, loop):
-    asyncio.create_task(coro)
-    return type('obj', (object,), {'result': noop})
-
-
-asyncio.run_coroutine_threadsafe = run_coroutine_threadsafe
-# End Alpaca SDK workaround
-
-
-# define APCA_API_SECRET_KEY and APCA_API_KEY environment variables
-api = REST()
+LOGGER = logging.getLogger(__name__)
 
 ALPACA_API_KEY = os.getenv("APCA_API_KEY_ID")
 ALPACA_SECRET_KEY = os.getenv("APCA_API_SECRET_KEY")
 
+api = REST()
+stream = Stream(
+    ALPACA_API_KEY,
+    ALPACA_SECRET_KEY,
+    base_url=URL("https://paper-api.alpaca.markets"),
+    data_feed="iex",
+)
+watch_list: set[str] = set()
 
-def get_historical_news(symbol):
+
+def _news_symbol(payload: object) -> str | None:
+    raw = getattr(payload, "_raw", {})
+    if "symbols" in raw and raw["symbols"]:
+        return str(raw["symbols"][0]).upper()
+    if hasattr(payload, "symbol"):
+        return str(payload.symbol).upper()
+    return None
+
+
+async def _seed_news(symbol: str) -> None:
     now = datetime.datetime.now(datetime.timezone.utc)
-    end = now - relativedelta(minutes=16)
-    start = now - relativedelta(days=8)
-    values = api.get_news(symbol, start.isoformat(), end.isoformat(), limit=50)
-    return [x._raw for x in values]
+    values = api.get_news(
+        symbol,
+        (now - relativedelta(days=8)).isoformat(),
+        (now - relativedelta(minutes=16)).isoformat(),
+        limit=10,
+    )
+    news_items = []
+    for item in values:
+        raw = item._raw
+        news_items.append(
+            {
+                "id": str(raw.get("id", "")),
+                "headline": raw.get("headline", ""),
+                "author": raw.get("author", ""),
+                "created_at": raw.get("created_at", ""),
+                "updated_at": raw.get("updated_at", ""),
+                "summary": raw.get("summary", ""),
+                "url": raw.get("url", ""),
+                "images": raw.get("images", []),
+                "symbols": raw.get("symbols", [symbol]),
+                "source": raw.get("source", "alpaca"),
+            }
+        )
+    if news_items:
+        await add_news(db, symbol, news_items)
 
 
-def get_historical_trades(symbol):
+async def bootstrap_symbol(symbol: str) -> None:
     now = datetime.datetime.now(datetime.timezone.utc)
-    end = now - relativedelta(minutes=16)
-    start = now - relativedelta(minutes=76)
-    values = api.get_trades(symbol, start.isoformat(),
-                            end.isoformat(), limit=50)
+    trade_values = api.get_trades(
+        symbol,
+        (now - relativedelta(minutes=76)).isoformat(),
+        (now - relativedelta(minutes=16)).isoformat(),
+        limit=50,
+    )
+    bar_values = api.get_bars(
+        symbol,
+        TimeFrame(1, TimeFrameUnit.Minute),
+        (now - relativedelta(minutes=76)).isoformat(),
+        (now - relativedelta(minutes=16)).isoformat(),
+        limit=200,
+    )
 
-    return [{
-        "date": dp.parse(x._raw["t"]).timestamp(),
-        "exchange": x._raw["x"],
-        "price": x._raw["p"],
-        "size": x._raw["s"],
-        "conditions": x._raw["c"],
-        "id": x._raw["i"],
-        "tape": x._raw["z"]
-    } for x in values]
+    for trade in trade_values:
+        raw = trade._raw
+        record_trade(
+            db_sync,
+            symbol,
+            int(dp.parse(raw["t"]).timestamp() * 1000),
+            float(raw["p"]),
+            int(raw["s"]),
+        )
 
+    for bar in bar_values:
+        raw = bar._raw
+        record_bar(
+            db_sync,
+            symbol,
+            int(dp.parse(raw["t"]).timestamp() * 1000),
+            float(raw["o"]),
+            float(raw["h"]),
+            float(raw["l"]),
+            float(raw["c"]),
+            int(raw["v"]),
+        )
 
-def get_historical_bars(symbol):
-    now = datetime.datetime.now(datetime.timezone.utc)
-    end = now - relativedelta(minutes=16)
-    start = now - relativedelta(minutes=76)
-    values = api.get_bars(symbol, TimeFrame(
-        1, TimeFrameUnit.Minute), start.isoformat(), end.isoformat(), limit=1000)
-    return [{
-        "date": dp.parse(x._raw["t"]).timestamp(),
-        "open": x._raw["o"],
-        "high": x._raw["h"],
-        "low": x._raw["l"],
-        "close": x._raw["c"],
-        "volume": x._raw["v"],
-    } for x in values]
-
-
-def get_historical_quotes(symbol):
-    now = datetime.datetime.now(datetime.timezone.utc)
-    end = now - relativedelta(minutes=16)
-    start = now - relativedelta(minutes=76)
-    values = api.get_quotes(symbol, start.isoformat(),
-                            end.isoformat(), limit=1000)
-    return [{
-        "date": dp.parse(x._raw["t"]).timestamp(),
-        "ask_exchange": x._raw["ax"],
-        "ask_price": x._raw["ap"],
-        "ask_size": x._raw["as"],
-        "bid_exchange": x._raw["bx"],
-        "bid_price": x._raw["bp"],
-        "bid_size": x._raw["bs"],
-        "conditions": x._raw["c"],
-    } for x in values]
+    await _seed_news(symbol)
 
 
-async def update_trade(trade: Trade):
-    """
-        Sample trade object:
-    {
-        'conditions': ['@'],
-        'exchange': 'V',
-        'id': 4864,
-        'price': 2923.175,
-        'size': 100,
-        'symbol': 'AMZN',
-        'tape': 'C',
-        'timestamp': 1646929983060642518
-    }
-    """
-    logging.log(logging.INFO, f'New trade for {trade.symbol}')
-    logging.log(logging.DEBUG, str(trade))
-    ts = db_sync.ts()
-    timestamp = str(int(trade.timestamp.timestamp() * 1000))
-    ts.madd([
-        (
-            f"stocks:{trade.symbol}:trades:price",
-            timestamp,
-            trade.price
-        ),
-        (
-            f"stocks:{trade.symbol}:trades:size",
-            timestamp,
-            trade.size
-        )])
-
-    if (db_sync.exists('trending-stocks')):
-        db_sync.topk().add('trending-stocks', trade.symbol)
-        await db.publish('trending-stocks', 'updated')
-
-    await db.publish('trade', trade.symbol)
+async def update_trade(trade: object) -> None:
+    symbol = str(getattr(trade, "symbol")).upper()
+    timestamp = int(getattr(trade, "timestamp").timestamp() * 1000)
+    record_trade(
+        db_sync,
+        symbol,
+        timestamp,
+        float(getattr(trade, "price")),
+        int(getattr(trade, "size")),
+    )
+    await db.publish("trade", symbol)
+    await db.publish("trending-stocks", "updated")
 
 
-async def incoming_trade(trade: Trade):
-    asyncio.create_task(update_trade(trade))
+async def update_bar(bar: object) -> None:
+    symbol = str(getattr(bar, "symbol")).upper()
+    timestamp_ns = int(getattr(bar, "timestamp"))
+    record_bar(
+        db_sync,
+        symbol,
+        timestamp_ns // 1_000_000,
+        float(getattr(bar, "open")),
+        float(getattr(bar, "high")),
+        float(getattr(bar, "low")),
+        float(getattr(bar, "close")),
+        int(getattr(bar, "volume")),
+    )
+    await db.publish("bar", symbol)
 
 
-async def update_bar(bar: Bar):
-    """
-        Sample bar object:
-    {
-        'close': 150.76,
-        'high': 150.78,
-        'low': 150.61,
-        'open': 150.61,
-        'symbol': 'AAPL',
-        'timestamp': 1647282120000000000,
-        'trade_count': 27,
-        'volume': 2199,
-        'vwap': 150.71078
-    }
-    """
-    logging.log(logging.INFO, f'New bar for {bar.symbol}')
-    logging.log(logging.DEBUG, str(bar))
-    ts = db_sync.ts()
-    timestamp = str(int(bar.timestamp / 1000000))
-    ts.madd([
-        (
-            f"stocks:{bar.symbol}:bars:close",
-            timestamp,
-            bar.close
-        ),
-        (
-            f"stocks:{bar.symbol}:bars:high",
-            timestamp,
-            bar.high
-        ),
-        (
-            f"stocks:{bar.symbol}:bars:open",
-            timestamp,
-            bar.open
-        ),
-        (
-            f"stocks:{bar.symbol}:bars:low",
-            timestamp,
-            bar.low
-        ),
-        (
-            f"stocks:{bar.symbol}:bars:volume",
-            timestamp,
-            bar.volume
-        )])
-
-    await db.publish('bar', bar.symbol)
+async def update_news(news: object) -> None:
+    symbol = _news_symbol(news)
+    if not symbol:
+        return
+    raw = getattr(news, "_raw", {})
+    await add_news(
+        db,
+        symbol,
+        [
+            {
+                "id": str(raw.get("id", "")),
+                "headline": raw.get("headline", ""),
+                "author": raw.get("author", ""),
+                "created_at": raw.get("created_at", ""),
+                "updated_at": raw.get("updated_at", ""),
+                "summary": raw.get("summary", ""),
+                "url": raw.get("url", ""),
+                "images": raw.get("images", []),
+                "symbols": raw.get("symbols", [symbol]),
+                "source": raw.get("source", "alpaca"),
+            }
+        ],
+    )
 
 
-async def incoming_bar(bar: Bar):
-    asyncio.create_task(update_bar(bar))
+async def subscribe(symbols: Iterable[str]) -> None:
+    normalized = [symbol.upper() for symbol in symbols]
+    if not normalized:
+        return
 
-async def update_news(news: NewsV2):
-    """
-        Sample news object:
-
-    {
-        "T": "n",
-        "id": 24918784,
-        "headline": "Corsair Reports Purchase Of Majority Ownership In iDisplay, No Terms Disclosed",
-        "summary": "Corsair Gaming, Inc. (NASDAQ:CRSR) (“Corsair”), a leading global provider and innovator of high-performance gear for gamers and content creators, today announced that it acquired a 51% stake in iDisplay",
-        "author": "Benzinga Newsdesk",
-        "created_at": "2022-01-05T22:00:37Z",
-        "updated_at": "2022-01-05T22:00:38Z",
-        "url": "https://www.benzinga.com/m-a/22/01/24918784/corsair-reports-purchase-of-majority-ownership-in-idisplay-no-terms-disclosed",
-        "content": "\u003cp\u003eCorsair Gaming, Inc. (NASDAQ:\u003ca class=\"ticker\" href=\"https://www.benzinga.com/stock/CRSR#NASDAQ\"\u003eCRSR\u003c/a\u003e) (\u0026ldquo;Corsair\u0026rdquo;), a leading global ...",
-        "symbols": ["CRSR"],
-        "source": "benzinga"
-    }
-    """
-    logging.log(logging.INFO, f'New news for {news.symbol}')
-    logging.log(logging.DEBUG, str(news))
-    try:
-        await Stock.add_news(news.symbol, News(
-            id=news._raw['id'],
-            headline=news._raw['headline'],
-            author=news._raw['author'],
-            created_at=news._raw['created_at'],
-            updated_at=news._raw['updated_at'],
-            summary=news._raw['summary'],
-            url=news._raw['url'],
-            images=news._raw['images'],
-            symbols=news._raw['symbols'],
-            source=news._raw['source'],
-        ))
-    except:
-        pass
-
-async def incoming_news(news: NewsV2):
-    asyncio.create_task(update_news(news))
+    LOGGER.info("Subscribing to %s", normalized)
+    for symbol in normalized:
+        await bootstrap_symbol(symbol)
+    stream.subscribe_trades(update_trade, *normalized)
+    stream.subscribe_bars(update_bar, *normalized)
+    stream.subscribe_news(update_news, *normalized)
 
 
-async def update_quote(quote: Quote):
-    """
-        Sample quote object:
-    {
-        'ask_exchange': 'V',
-        'ask_price': 150.74,
-        'ask_size': 4,
-        'bid_exchange': 'V',
-        'bid_price': 150.4,
-        'bid_size': 2,
-        'conditions': ['R'],
-        'symbol': 'AAPL',
-        'tape': 'C',
-        'timestamp': 1647282073919284035
-    }
-    """
-    logging.log(logging.INFO, f'New quote for {quote.symbol}')
-    logging.log(logging.DEBUG, str(quote))
-    ts = db_sync.ts()
-    timestamp = str(int(quote.timestamp.timestamp() * 1000))
-    ts.madd([
-        (
-            f"stocks:{quote.symbol}:quotes:ask_price",
-            timestamp,
-            quote.ask_price
-        ),
-        (
-            f"stocks:{quote.symbol}:quotes:ask_size",
-            timestamp,
-            quote.ask_size
-        ),
-        (
-            f"stocks:{quote.symbol}:quotes:bid_price",
-            timestamp,
-            quote.bid_price
-        ),
-        (
-            f"stocks:{quote.symbol}:quotes:bid_size",
-            timestamp,
-            quote.bid_size
-        )])
+async def unsubscribe(symbols: Iterable[str]) -> None:
+    normalized = [symbol.upper() for symbol in symbols]
+    if not normalized:
+        return
 
-async def incoming_quote(quote: Quote):
-    asyncio.create_task(update_quote(quote))
+    LOGGER.info("Unsubscribing from %s", normalized)
+    stream.unsubscribe_trades(*normalized)
+    stream.unsubscribe_bars(*normalized)
+    stream.unsubscribe_news(*normalized)
 
 
-async def initialize_stock(symbol: str):
-    stock = await Stock.get(symbol)
+async def sync_watchlist() -> None:
+    global watch_list
+    new_watch_list = set(await get_watchlist(db))
+    removed = sorted(watch_list - new_watch_list)
+    added = sorted(new_watch_list - watch_list)
 
-    if len(stock.news) == 0:
-        stock.news = get_historical_news(symbol)
+    if removed:
+        await unsubscribe(removed)
+    if added:
+        await subscribe(added)
 
-        await stock.save()
+    watch_list = new_watch_list
 
-    trades = get_historical_trades(symbol)
-    bars = get_historical_bars(symbol)
-    ts = db_sync.ts()
-    ts_keys = [
-        f"stocks:{symbol}:trades:price",
-        f"stocks:{symbol}:trades:size",
-        f"stocks:{symbol}:bars:open",
-        f"stocks:{symbol}:bars:high",
-        f"stocks:{symbol}:bars:low",
-        f"stocks:{symbol}:bars:close",
-        f"stocks:{symbol}:bars:volume",
-    ]
 
-    for key in ts_keys:
-        if db_sync.exists(key):
+async def listen_for_watchlist_updates() -> None:
+    pubsub = db.pubsub()
+    await pubsub.subscribe("watchlist-updated")
+
+    async for event in pubsub.listen():
+        if event["type"] == "subscribe":
             continue
-        ts.create(key, duplicate_policy='last', labels={'symbol': symbol})
-
-    queries = [(f"stocks:{symbol}:trades:price", str(
-        int(trade['date'] * 1000)), trade['price']) for trade in trades]
-    queries += [(f"stocks:{symbol}:trades:size",
-                 str(int(trade['date'] * 1000)), trade['size']) for trade in trades]
-    queries += [(f"stocks:{symbol}:bars:open",
-                 str(int(bar['date'] * 1000)), bar['open']) for bar in bars]
-    queries += [(f"stocks:{symbol}:bars:high",
-                 str(int(bar['date'] * 1000)), bar['high']) for bar in bars]
-    queries += [(f"stocks:{symbol}:bars:low",
-                 str(int(bar['date'] * 1000)), bar['low']) for bar in bars]
-    queries += [(f"stocks:{symbol}:bars:close",
-                 str(int(bar['date'] * 1000)), bar['close']) for bar in bars]
-    queries += [(f"stocks:{symbol}:bars:volume",
-                 str(int(bar['date'] * 1000)), bar['volume']) for bar in bars]
-
-    ts.madd(queries)
-
-    return stock
-
-conn = Stream(ALPACA_API_KEY,
-              ALPACA_SECRET_KEY,
-              base_url=URL('https://paper-api.alpaca.markets'),
-              data_feed='iex')
+        await sync_watchlist()
 
 
-def connect():
-    global conn
+async def run_live() -> None:
+    if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
+        raise RuntimeError("Live mode requires Alpaca credentials")
 
-    logging.log(logging.INFO, "Connecting to Alpaca")
-    try:
-        conn.run()
-    except Exception as e:
-        print(e)
-
-
-async def aioconnect():
-    global conn
-    logging.log(logging.INFO, "Connecting to Alpaca")
-
-    try:
-        await conn._run_forever()
-    except Exception as e:
-        print(e)
-
-
-async def unsubscribe(*symbols: str):
-    global conn
-    conn.unsubscribe_trades(*symbols)
-    conn.unsubscribe_bars(*symbols)
-    conn.unsubscribe_news(*symbols)
-
-
-async def subscribe(*symbols: str):
-    global conn
-    logging.log(logging.INFO, f'Subscribing to {symbols}')
-    for symbol in symbols:
-        await initialize_stock(symbol)
-    conn.subscribe_trades(incoming_trade, *symbols)
-    conn.subscribe_bars(incoming_bar, *symbols)
-    conn.subscribe_news(incoming_news, *symbols)
-    logging.log(logging.INFO, f'Subscribed to {symbols}')
-
-
-watch_list = []
-
-
-async def sync_watchlist():
-    try:
-        global watch_list
-        new_watch_list = await db.smembers('watchlist')
-
-        unsubs = [s.decode('utf-8').upper()
-                  for s in set(watch_list) - set(new_watch_list)]
-        subs = [s.decode('utf-8').upper()
-                for s in set(new_watch_list) - set(watch_list)]
-
-        if len(unsubs) > 0:
-            await unsubscribe(*unsubs)
-            time.sleep(3)
-
-        if len(subs) > 0:
-            await subscribe(*subs)
-            time.sleep(3)
-
-        watch_list = new_watch_list
-    except Exception as e:
-        print(e)
+    await sync_watchlist()
+    asyncio.create_task(listen_for_watchlist_updates())
+    await stream._run_forever()

@@ -1,26 +1,34 @@
-FROM node:14.18.0-alpine
+FROM node:22-alpine AS deps
+
+WORKDIR /app
+
+COPY package.json .
+RUN npm install
+
+FROM node:22-alpine AS builder
 
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_WS_URL
 
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
-ENV PORT 3000
 
-# Create app directory
-RUN mkdir -p /usr/src/app
-WORKDIR /usr/src/app
-
-# Installing dependencies
-COPY package*.json /usr/src/app/
-RUN npm install
-
-# Copying source files
-COPY . /usr/src/app
-
-# Building app
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 RUN npm run build
+
+FROM node:22-alpine AS runner
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+WORKDIR /app
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
+COPY --from=deps /app/node_modules ./node_modules
+
 EXPOSE 3000
 
-# Running the app
-CMD ["npm", "start"]
+CMD ["npm", "run", "start"]

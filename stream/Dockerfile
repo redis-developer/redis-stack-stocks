@@ -1,17 +1,10 @@
-FROM python:3.10.5-alpine
+FROM python:3.13-alpine
 
 WORKDIR /app
-ADD . /app
 
-# System deps:
-RUN apk update && apk add python3-dev \
-                        gcc \
-                        g++ \
-                        libc-dev \
-                        libffi-dev
+COPY requirements.txt .
+RUN apk add --no-cache gcc musl-dev libffi-dev && pip install --no-cache-dir -r requirements.txt
 
-RUN pip install -r requirements.txt
-
-EXPOSE 8000
+COPY . .
 
 CMD ["python", "main.py"]
